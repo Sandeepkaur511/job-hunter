@@ -7,11 +7,26 @@ main.py - Orchestrator with Dynamic Tier 2 Fallback:
 """
 import os
 import sys
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+# Safe cross-platform UTF-8 reconfiguration
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+
+# Verify environment secrets before proceeding
+REQUIRED_SECRETS = ["GEMINI_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]
+missing = [s for s in REQUIRED_SECRETS if not os.getenv(s)]
+if missing:
+    print(f"\n[FATAL] Missing required environment secrets: {', '.join(missing)}", flush=True)
+    print("Please add these in your repository Settings -> Secrets and variables -> Actions:", flush=True)
+    print("https://github.com/Sandeepkaur511/job-hunter/settings/secrets/actions\n", flush=True)
+    sys.exit(1)
 
 from database import init_db, is_seen, mark_seen, log_run
 import scrapers
@@ -55,8 +70,8 @@ def run():
     # ─────────────────────────────────────────────────────────────
     # STEP 2: TIER 2 FALLBACK - NATIONAL INDIAN REMOTE & HYBRID
     # ─────────────────────────────────────────────────────────────
+    tier2_jobs = []
     if len(matched_jobs) < MIN_DESIRED_MATCHES:
-        needed = MIN_DESIRED_MATCHES - len(matched_jobs)
         print(f"\n[FALLBACK TRIGGERED] Seeking at least {MIN_DESIRED_MATCHES} jobs today. Fetching Indian National Remote & Hybrid...", flush=True)
         tier2_jobs = scrapers.scrape_indeed_india_remote()
         new_tier2 = [j for j in tier2_jobs if not is_seen(j["id"])]
@@ -69,7 +84,7 @@ def run():
                 if j not in matched_india:
                     mark_seen(j, status="skipped")
 
-    total_scanned = len(tier1_jobs) + (len(tier2_jobs) if 'tier2_jobs' in locals() else 0)
+    total_scanned = len(tier1_jobs) + len(tier2_jobs)
 
     # ─────────────────────────────────────────────────────────────
     # STEP 3: RECORD MATCHES AND DISPATCH INTERACTIVE TELEGRAM CARDS

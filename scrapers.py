@@ -221,7 +221,11 @@ def scrape_indeed_india_remote() -> list:
     print("[TIER 2] Indeed India (Remote & Hybrid Data Roles)...", flush=True)
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            # Linux CI requires --no-sandbox flags
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+            )
             page = browser.new_page(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0")
 
             queries = [
@@ -259,11 +263,11 @@ def scrape_indeed_india_remote() -> list:
                             "easy_apply": False,
                         })
                 except Exception as ex:
-                    print(f"  Query note: {ex}", flush=True)
+                    print(f"  Indeed query note: {ex}", flush=True)
 
             browser.close()
     except Exception as e:
-        print(f"[TIER 2] Indeed India error: {e}", flush=True)
+        print(f"[TIER 2] Indeed India note: {e}", flush=True)
 
     seen = set()
     unique = [j for j in jobs if not (j["id"] in seen or seen.add(j["id"]))]

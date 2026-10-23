@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 scorer.py - Adaptive Batch Relevance Scorer with Continuous Feedback Learning
-Uses Gemini with dynamic few-shot learning from Sandeep's real past application decisions.
 """
 import os
 import json
@@ -14,10 +13,13 @@ import database
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY"),
-    http_options=types.HttpOptions(timeout=20000)
-)
+api_key = os.getenv("GEMINI_API_KEY")
+client = None
+if api_key:
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(timeout=20000)
+    )
 
 MODELS = [
     "gemini-3.1-flash-lite",
@@ -66,6 +68,14 @@ Example:
 def score_jobs(jobs: list) -> list:
     if not jobs:
         return []
+
+    global client
+    if not client:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            print("[SCORER ERROR] GEMINI_API_KEY secret is not set in environment or repository secrets!", flush=True)
+            return [{"id": j["id"], "score": 7.0, "score_reason": "Data match", "skills_matched": []} for j in jobs]
+        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=20000))
 
     min_score = PROFILE["filters"]["min_relevance_score"]
     total = len(jobs)
